@@ -228,7 +228,7 @@ class UIManager {
 
 // Network Manager
 class NetworkManager {
-  private isConnected: boolean = false;
+  public isConnected: boolean = false;
   isCurrentlyConnected(): boolean {
     return this.isConnected;
   }
@@ -474,9 +474,10 @@ class Terminal {
           this.ui.writeLine(`connexion to ${args} failed, please check ip and name by using scan or maybe you have wrong password `);
           return
         }
+        this.network.isConnected = true
         this.fs.setCurrentComputer(newCurrentComputer)
         this.fs.getCurrentComputer().authority = "guest"
-        this.ui.updatePrompt(this.getPromptToUpdate(), true, this.fs.getCurrentComputer().authority);
+        this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), this.fs.getCurrentComputer().authority);
         this.ui.updateConnectionBadge(true);
         this.ui.writeLine(`connexion succeed, you are now connected to ${this.fs.getCurrentComputer().addressIp} ${this.fs.getCurrentComputer().name} => ${this.fs.getCurrentFolder().name}`);
         return
@@ -485,9 +486,10 @@ class Terminal {
       disconnect: async () => {
         this.ui.writeLine(`disconnecting...`);
         await this.delay(Math.random() * 1000 + 500)
+        this.network.isConnected = false
         this.fs.setCurrentComputer(this.fs.getOwnerComputer())
         this.fs.getCurrentComputer().authority = "admin"
-        this.ui.updatePrompt(this.getPromptToUpdate(), true, this.fs.getCurrentComputer().authority);
+        this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), this.fs.getCurrentComputer().authority);
         this.ui.updateConnectionBadge(false);
         this.ui.writeLine(`disconnect succeed, you are now back to ${this.fs.getCurrentComputer().addressIp} ${this.fs.getCurrentComputer().name} => ${this.fs.getCurrentFolder().name}`);
         return
