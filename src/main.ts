@@ -3,7 +3,7 @@
    - Drop into Vite vanilla-ts
 */
 
-import { authorityCompare } from "./computer/authority/Authority";
+import { authorityCompare, type Authority } from "./computer/authority/Authority";
 import { Computer } from "./computer/Computer";
 import MyFile from "./computer/elements/File";
 import { Folder } from "./computer/elements/Folder";
@@ -70,6 +70,8 @@ class FileSystemManager {
   constructor() {
 
     this.ownerComputer = new Computer("192.168.0.42", "wax", "wax")
+      .withPasswordAuthUser("user")
+      .withPasswordAuthAdmin("admin")
       .withMainFolder(
         new Folder("main").withFiles(
           [
@@ -199,7 +201,19 @@ class UIManager {
     this.memTotEl.textContent = String(memory.total);
   }
 
-  updatePrompt(cwd: string, isConnected: boolean): void {
+  updatePrompt(cwd: string, isConnected: boolean, authority: Authority): void {
+    this.cwdEl.classList.remove("cwdAuthAdmin", "cwdAuthUser", "cwdAuthGuest");
+    switch (authority) {
+      case "admin":
+        this.cwdEl.classList.add("cwdAuthAdmin");
+        break;
+      case "user":
+        this.cwdEl.classList.add("cwdAuthUser");
+        break;
+      case "guest":
+        this.cwdEl.classList.add("cwdAuthGuest");
+        break;
+    }
     this.cwdEl.textContent = cwd + (isConnected ? "#" : "$");
   }
 
@@ -285,24 +299,77 @@ class Terminal {
   private getCommands(): Record<string, (args: string[]) => Promise<void>> {
     return {
 
-      // ---------------------------------
-      // TEMP
-
       changeAuth: async (args) => {
         const value = args[0];
-        if (value === "admin" || value === "user" || value === "guest") {
-          this.fs.getCurrentComputer().authority = value;
-          this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected())
-          return
+        const password = args[1];
+
+        if (!["admin", "user", "guest"].includes(value)) {
+          this.ui.writeLine("Error command, usage: changeAuth <admin | user | guest> <?password>");
+          return;
         }
-        this.ui.writeLine("Usage: changeAuth <admin> or <user> or <guest>");
+
+        const computer = this.fs.getCurrentComputer();
+        const currentAuth = computer.authority;
+
+        // Helper function to change authority and update UI
+        const changeToAuth = (newAuth: "admin" | "user" | "guest") => {
+          computer.authority = newAuth;
+          this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), newAuth);
+          this.ui.writeLine(`you are now connected as ${newAuth}`);
+        };
+
+        // Helper function to check password and change auth
+        const checkPasswordAndChange = (targetAuth: "admin" | "user" | "guest", requiredPassword: string) => {
+          if (requiredPassword === "") {
+            changeToAuth(targetAuth);
+            return true;
+          }
+
+          if (password && requiredPassword === password) {
+            changeToAuth(targetAuth);
+            return true;
+          }
+
+          this.ui.writeLine("Error wrong password, usage: changeAuth <admin | user | guest> <?password>");
+          return false;
+        };
+
+        // Type assertion since we've already validated the value
+        const targetAuth = value as "admin" | "user" | "guest";
+
+        // Admin can change to any authority without password
+        if (currentAuth === "admin") {
+          changeToAuth(targetAuth);
+          return;
+        }
+
+        // Handle specific authority changes
+        switch (targetAuth) {
+          case "admin":
+            checkPasswordAndChange("admin", computer.passwordAuthAdmin);
+            break;
+
+          case "user":
+            if (currentAuth === "user") {
+              this.ui.writeLine("you are now connected as user");
+            } else {
+              checkPasswordAndChange("user", computer.passwordAuthUser);
+            }
+            break;
+
+          case "guest":
+            if (currentAuth === "guest") {
+              this.ui.writeLine("you are now connected as guest");
+            } else {
+              changeToAuth("guest");
+            }
+            break;
+        }
       },
 
-      // ---------------------------------
-
       help: async () => {
-        this.ui.writeLine("Commandes: help, ls, cat, pwd, cd, echo, scan, connect, run, mem, clear, whoami, save, load, reset");
-        this.ui.writeLine("Ex: ls, cat readme.txt, cd /home, scan, connect <1.2.0.7> <name> <?password>, run tracer, save/load fs (IndexedDB)");
+        this.ui.writeLine("Commandes: help, ls, cat, pwd, cd, echo, scan, connect, changeAuth, run, mem, clear, whoami, save, load, reset");
+        this.ui.writeLine("Ex: ls, cat readme.txt, cd /home, scan, connect <1.2.0.7> <name> <?password>, changeAuth <admin | user | guest> <?password>, run tracer, save/load fs (IndexedDB)");
       },
 
       ls: async () => {
@@ -331,7 +398,7 @@ class Terminal {
           if (currentFolder.parent) {
             this.fs.setCurrentFolder(currentFolder.parent)
             this.ui.writeLine(`currentFolder : ` + currentFolder.parent.name)
-            this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected());
+            this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), this.fs.getCurrentComputer().authority);
             return
           }
           this.ui.writeLine(`error : no parent folder.`)
@@ -342,7 +409,7 @@ class Terminal {
           if (authorityCompare(this.fs.getCurrentComputer().authority, childFolder.accessAuthorityLevel)) {
             this.fs.setCurrentFolder(childFolder)
             this.ui.writeLine(`currentFolder : ` + childFolder.name)
-            this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected());
+            this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), this.fs.getCurrentComputer().authority);
             return
           }
         }
@@ -404,12 +471,12 @@ class Terminal {
         await this.delay(500)
         const newCurrentComputer = this.fs.getCurrentComputer().computersLinked.find(c => c.addressIp === ip && c.name === name && ((c.password) ? c.password === password : true))
         if (!newCurrentComputer) {
-          this.ui.writeLine(`connexion to ${args} failed, please check ip and name`);
+          this.ui.writeLine(`connexion to ${args} failed, please check ip and name by using scan or maybe you have wrong password `);
           return
         }
         this.fs.setCurrentComputer(newCurrentComputer)
         this.fs.getCurrentComputer().authority = "guest"
-        this.ui.updatePrompt(this.getPromptToUpdate(), true);
+        this.ui.updatePrompt(this.getPromptToUpdate(), true, this.fs.getCurrentComputer().authority);
         this.ui.updateConnectionBadge(true);
         this.ui.writeLine(`connexion succeed, you are now connected to ${this.fs.getCurrentComputer().addressIp} ${this.fs.getCurrentComputer().name} => ${this.fs.getCurrentFolder().name}`);
         return
@@ -420,7 +487,7 @@ class Terminal {
         await this.delay(Math.random() * 1000 + 500)
         this.fs.setCurrentComputer(this.fs.getOwnerComputer())
         this.fs.getCurrentComputer().authority = "admin"
-        this.ui.updatePrompt(this.getPromptToUpdate(), true);
+        this.ui.updatePrompt(this.getPromptToUpdate(), true, this.fs.getCurrentComputer().authority);
         this.ui.updateConnectionBadge(false);
         this.ui.writeLine(`disconnect succeed, you are now back to ${this.fs.getCurrentComputer().addressIp} ${this.fs.getCurrentComputer().name} => ${this.fs.getCurrentFolder().name}`);
         return
@@ -480,7 +547,7 @@ class Terminal {
     this.ui.writeLine("Hacknet-like terminal prototype (Vanilla TS)");
     this.ui.writeLine("Tape 'help' pour commencer.");
     this.ui.updateMemoryUI(this.memory.getMemory());
-    this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected());
+    this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), this.fs.getCurrentComputer().authority);
 
     // Try autoload FS if exists
     const saved = await this.db.get<Record<string, FileNode>>("fs");

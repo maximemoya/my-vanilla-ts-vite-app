@@ -9,6 +9,8 @@ export class Computer {
     private _authority: Authority = "admin"
 
     private _password: string = ""
+    private _passwordAuthUser: string = ""
+    private _passwordAuthAdmin: string = ""
 
     private _computersLinked: Computer[] = []
 
@@ -45,6 +47,16 @@ export class Computer {
                 computer._computersLinked.push(this);
             }
         }
+        return this;
+    }
+
+    public withPasswordAuthUser(passwordAuthUser: string): Computer {
+        this.passwordAuthUser = passwordAuthUser;
+        return this;
+    }
+
+    public withPasswordAuthAdmin(passwordAuthAdmin: string): Computer {
+        this.passwordAuthAdmin = passwordAuthAdmin;
         return this;
     }
 
@@ -105,6 +117,22 @@ export class Computer {
 
     set password(value: string) {
         this._password = value;
+    }
+
+    get passwordAuthUser(): string {
+        return this._passwordAuthUser;
+    }
+
+    set passwordAuthUser(value: string) {
+        this._passwordAuthUser = value;
+    }
+
+    get passwordAuthAdmin(): string {
+        return this._passwordAuthAdmin;
+    }
+
+    set passwordAuthAdmin(value: string) {
+        this._passwordAuthAdmin = value;
     }
 
 }

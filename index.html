@@ -10,7 +10,9 @@
       --bg: #071018;
       --panel: #0b1220;
       --text: #bde7c8;
-      --muted: #7f8b88;
+      --authAdmin: #ab75d6;
+      --authUser: #b29654;
+      --authGuest: #7f8b88;
       --accent: #4f46e5;
     }
 
@@ -98,9 +100,21 @@
       margin-top: 10px;
     }
 
-    .cwd {
+    .cwdAuthAdmin {
       min-width: 160px;
-      color: var(--muted);
+      color: var(--authAdmin);
+      font-size: 13px;
+    }
+
+    .cwdAuthUser {
+      min-width: 160px;
+      color: var(--authUser);
+      font-size: 13px;
+    }
+
+    .cwdAuthGuest {
+      min-width: 160px;
+      color: var(--authGuest);
       font-size: 13px;
     }
 
@@ -134,7 +148,15 @@
     }
 
     @media (max-width:700px) {
-      .cwd {
+      .cwdAuthAdmin {
+        display: none
+      }
+
+      .cwdAuthUser {
+        display: none
+      }
+
+      .cwdAuthGuest {
         display: none
       }
     }
@@ -153,7 +175,7 @@
       <div class="output" id="output" tabindex="0"></div>
 
       <form id="form" class="inputRow" autocomplete="off">
-        <div class="cwd" id="cwd">/home$</div>
+        <div class="cwdAuthAdmin" id="cwd">/home$</div>
         <input id="cmd" class="cmd" placeholder="Tape une commande (help)..." />
         <button type="submit">Entrer</button>
       </form>
