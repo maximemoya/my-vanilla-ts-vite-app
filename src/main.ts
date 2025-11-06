@@ -68,7 +68,6 @@ class FileSystemManager {
   private currentFolder: Folder;
 
   constructor() {
-
     this.ownerComputer = new Computer("192.168.0.42", "wax", "wax")
       .withPasswordAuthUser("user")
       .withPasswordAuthAdmin("admin")
@@ -99,7 +98,6 @@ class FileSystemManager {
 
     this.currentComputer = this.ownerComputer
     this.currentFolder = this.currentComputer.mainFolder
-
   }
 
   getOwnerComputer(): Computer {
@@ -425,6 +423,17 @@ class Terminal {
           const file = currentFolder.files?.find(file => file.name === path)
           if (file) {
             if (authorityCompare(this.fs.getCurrentComputer().authority, file.accessAuthorityLevel)) {
+
+              // Log the connection on the target machine
+              const varFolder = this.fs.getCurrentComputer().mainFolder.children?.find(f => f.name === 'var');
+              const logFolder = varFolder?.children?.find(f => f.name === 'log');
+              const logFile = logFolder?.files?.find(f => f.name === 'connections.log');
+              if (logFile) {
+                const timestamp = new Date().toISOString();
+                const logEntry = `\n[${timestamp}] read file ${file.name}`;
+                logFile.content += logEntry;
+              }
+
               this.ui.writeLine(file.content)
               return
             }
@@ -463,24 +472,55 @@ class Terminal {
       },
 
       connect: async (args) => {
-        const ip = args[0]
-        const name = args[1]
-        const password = args[2] ? args[2] : ""
+        const ip = args[0];
+        const name = args[1];
+        const password = args[2] ? args[2] : "";
         if (!ip || !name) return this.ui.writeLine("Usage: connect <ip> <name> <?password>");
+
         this.ui.writeLine(`try to connect to ${args} ...`);
-        await this.delay(500)
-        const newCurrentComputer = this.fs.getCurrentComputer().computersLinked.find(c => c.addressIp === ip && c.name === name && ((c.password) ? c.password === password : true))
+        await this.delay(500);
+
+        const sourceIp = this.fs.getCurrentComputer().addressIp;
+        const newCurrentComputer = this.fs.getCurrentComputer().computersLinked.find(c => c.addressIp === ip && c.name === name && ((c.password) ? c.password === password : true));
+
         if (!newCurrentComputer) {
           this.ui.writeLine(`connexion to ${args} failed, please check ip and name by using scan or maybe you have wrong password `);
-          return
+          return;
         }
-        this.network.isConnected = true
-        this.fs.setCurrentComputer(newCurrentComputer)
-        this.fs.getCurrentComputer().authority = "guest"
+
+        // Log the connection on the target machine
+        let varFolder = newCurrentComputer.mainFolder.children?.find(f => f.name === 'var');
+        if (!varFolder) {
+          varFolder = new Folder("var", "admin");
+          newCurrentComputer.mainFolder.withChildFolder(varFolder);
+        }
+
+        let logFolder = varFolder.children?.find(f => f.name === 'log');
+        if (!logFolder) {
+          logFolder = new Folder("log", "admin");
+          varFolder.withChildFolder(logFolder);
+        }
+
+        let logFile = logFolder.files?.find(f => f.name === 'connections.log');
+        if (!logFile) {
+          logFile = new MyFile("connections.log", "[LOGS STARTED]\n", "user");
+          if (!logFolder.files) {
+            logFolder.files = [];
+          }
+          logFolder.files.push(logFile);
+        }
+
+        const timestamp = new Date().toISOString();
+        const logEntry = `\n[${timestamp}] Connection received from ${sourceIp}`;
+        logFile.content += logEntry;
+
+        this.network.isConnected = true;
+        this.fs.setCurrentComputer(newCurrentComputer);
+        this.fs.getCurrentComputer().authority = "guest";
         this.ui.updatePrompt(this.getPromptToUpdate(), this.network.isCurrentlyConnected(), this.fs.getCurrentComputer().authority);
         this.ui.updateConnectionBadge(true);
         this.ui.writeLine(`connexion succeed, you are now connected to ${this.fs.getCurrentComputer().addressIp} ${this.fs.getCurrentComputer().name} => ${this.fs.getCurrentFolder().name}`);
-        return
+        return;
       },
 
       disconnect: async () => {
@@ -507,6 +547,46 @@ class Terminal {
         this.ui.writeLine(`${tool}: terminé.`);
         this.memory.free(memCost);
         this.ui.updateMemoryUI(this.memory.getMemory());
+      },
+
+      rm: async (args) => {
+        const path = args[0];
+        if (!path) return this.ui.writeLine("Usage: rm <file_or_folder>");
+
+        const currentFolder = this.fs.getCurrentFolder();
+        const currentUserAuthority = this.fs.getCurrentComputer().authority;
+
+        // Try to delete a file first
+        const fileIndex = currentFolder.files?.findIndex(f => f.name === path) ?? -1;
+        if (fileIndex !== -1 && currentFolder.files) {
+          const file = currentFolder.files[fileIndex];
+          if (authorityCompare(currentUserAuthority, file.accessAuthorityLevel)) {
+            currentFolder.files.splice(fileIndex, 1);
+            this.ui.writeLine(`File '${path}' deleted.`);
+          } else {
+            this.ui.writeLine(`rm: permission denied to delete file '${path}'.`);
+          }
+          return;
+        }
+
+        // If not a file, try to delete a folder
+        const folderIndex = currentFolder.children?.findIndex(f => f.name === path) ?? -1;
+        if (folderIndex !== -1 && currentFolder.children) {
+          const folder = currentFolder.children[folderIndex];
+          if (authorityCompare(currentUserAuthority, folder.accessAuthorityLevel)) {
+            if (!folder.children || folder.children.length === 0) {
+              currentFolder.children.splice(folderIndex, 1);
+              this.ui.writeLine(`Folder '${path}' and its files have been deleted.`);
+            } else {
+              this.ui.writeLine(`rm: failed to remove '${path}': Directory contains other directories.`);
+            }
+          } else {
+            this.ui.writeLine(`rm: permission denied to delete folder '${path}'.`);
+          }
+          return;
+        }
+
+        this.ui.writeLine(`rm: cannot remove '${path}': No such file or directory.`);
       },
 
       save: async () => {
