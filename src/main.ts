@@ -212,10 +212,47 @@ class Terminal {
     this.cmdInput.addEventListener("keydown", (ev) => {
       if (ev.key === "Tab") {
         ev.preventDefault();
-        const keys = Object.keys(commands);
-        const val = this.cmdInput.value;
-        const match = keys.find(k => k.startsWith(val));
-        if (match) this.cmdInput.value = match + " ";
+
+        const value = this.cmdInput.value;
+        const trimmedValue = value.trim();
+        const parts = trimmedValue.split(/\s+/);
+        const commandName = parts[0];
+        const lastPart = parts[parts.length - 1];
+
+        const fileAndFolderCommands = ["cat", "cd", "rm"];
+        const programs = ["ping", "tracer"];
+
+        if (parts.length === 1) {
+          const commandKeys = Object.keys(commands);
+          const matches = commandKeys.filter(k => k.startsWith(commandName));
+          if (matches.length === 1) {
+            this.cmdInput.value = matches[0] + " ";
+          } else if (matches.length > 1) {
+            this.ui.writeLine(matches.join("  "));
+          }
+        } else if (parts.length > 1 && fileAndFolderCommands.includes(commandName)) {
+          const currentFolder = this.fs.getCurrentFolder();
+          const suggestions = [
+            ...(currentFolder.files?.map(f => f.name) ?? []),
+            ...(currentFolder.children?.map(f => f.name) ?? [])
+          ].filter(name => name.startsWith(lastPart));
+
+          if (suggestions.length === 1) {
+            const completedValue = trimmedValue.substring(0, trimmedValue.length - lastPart.length) + suggestions[0];
+            this.cmdInput.value = completedValue + " ";
+          } else if (suggestions.length > 1) {
+            this.ui.writeLine(suggestions.join("  "));
+          }
+        } else if (parts.length > 1 && commandName === "run") {
+          const suggestions = programs.filter(p => p.startsWith(lastPart));
+
+          if (suggestions.length === 1) {
+            const completedValue = trimmedValue.substring(0, trimmedValue.length - lastPart.length) + suggestions[0];
+            this.cmdInput.value = completedValue + " ";
+          } else if (suggestions.length > 1) {
+            this.ui.writeLine(suggestions.join("  "));
+          }
+        }
       }
     });
   }
