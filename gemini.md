@@ -20,8 +20,14 @@ This project is a "Hacknet-like" terminal simulator game built with Vanilla Type
 - `tsconfig.json`: TypeScript compiler configuration.
 - `src/`: Contains all the application source code.
   - `main.ts`: The main entry point. It initializes and orchestrates all the different components of the application.
+  - `types.ts`: Contains all the types and interfaces for the application.
+  - `vite-env.d.ts`: Vite environment declarations.
+  - `commands/`: Contains the command implementations.
+    - `commands.ts`: Aggregates all the sub-commands.
+    - `subCommands/`: Contains each command in its own file.
   - `computer/`: Contains the core data models for the simulation.
     - `Computer.ts`: Defines the `Computer` class, representing a machine in the network.
+    - `ComputerTest.ts`: Contains test data for computers.
     - `elements/`: Defines the file system components.
       - `File.ts`: The `MyFile` class.
       - `Folder.ts`: The `Folder` class.
@@ -55,12 +61,21 @@ The application is managed by the main `Terminal` class in `main.ts`, which coor
 
 ### Key Commands:
 
-- `help`: Lists available commands.
-- `ls`: Lists files and directories in the current folder, respecting authority levels.
-- `cd <path>`: Changes the current directory.
-- `cat <file>`: Displays the content of a file, respecting authority levels.
-- `scan`: Lists computers visible on the current network.
-- `connect <ip> <name> [password]`: Connects to another computer.
-- `disconnect`: Returns to the owner's computer.
-- `changeAuth <level> [password]`: Attempts to elevate or change the authority level on the current computer.
-- `save`/`load`: (WIP) Intended to persist the game state to IndexedDB.
+- `help`: Lists available commands. Example: `help`
+- `ls`: Lists files and directories in the current folder, respecting authority levels. Example: `ls`
+- `cat <file>`: Displays the content of a file, respecting authority levels. Example: `cat readme.txt`
+- `pwd`: Prints the current working directory. Example: `pwd`
+- `cd <path>`: Changes the current directory. Example: `cd /home` or `cd ..`
+- `echo <text>`: Echoes the provided arguments. Example: `echo Hello World`
+- `whoami`: Displays the current authority level. Example: `whoami`
+- `clear`: Clears the terminal output. Example: `clear`
+- `mem`: Displays current memory usage. Example: `mem`
+- `scan`: Scans the network for linked computers. Example: `scan`
+- `connect <ip> <name> [password]`: Connects to another computer. Example: `connect 1.2.0.7 Bob mypassword`
+- `disconnect`: Disconnects from the current computer and returns to the owner computer. Example: `disconnect`
+- `run <program>`: Runs a program, consuming memory. Example: `run tracer`
+- `rm <file_or_folder>`: Removes a file or a folder with no folder inside. Example: `rm test.txt`
+- `changeAuth <level> [password]`: Attempts to elevate or change the authority level on the current computer. Example: `changeAuth admin mypassword`
+- `save`: Saves the current game state (work in progress). Example: `save`
+- `load`: Loads a previously saved game state (work in progress). Example: `load`
+- `reset`: Resets the file system and clears IndexedDB. Example: `reset`
